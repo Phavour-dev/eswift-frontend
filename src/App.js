@@ -99,7 +99,7 @@ function ToastContainer({ toasts, removeToast }) {
 }
 
 function App() {
-  const { publicKey, sendTransaction, connected } = useWallet();
+  const { publicKey, sendTransaction, signTransaction, connected } = useWallet();
   const [loading, setLoading] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -192,12 +192,25 @@ function App() {
   useEffect(() => { if (connected) { fetchEscrows(); fetchWlEscrows(); } }, [connected]);
   useEffect(() => { if (connected && tab === "services") fetchWlEscrows(); if (connected && tab !== "services") fetchEscrows(); }, [tab]);
 
+  // ===== FIXED signAndSend =====
   const signAndSend = async (tx) => {
-    if (!sendTransaction) throw new Error("Wallet not connected");
-    return await sendTransaction(tx, connection);
+    if (!publicKey) throw new Error("Wallet not connected");
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = publicKey;
+    if (signTransaction) {
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
+      await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight });
+      return sig;
+    }
+    if (sendTransaction) {
+      return await sendTransaction(tx, connection);
+    }
+    throw new Error("No signing method available");
   };
 
-  // ============ ALL BUSINESS LOGIC (unchanged) ============
+  // ============ ALL BUSINESS LOGIC ============
   const createEscrow = async () => {
     if (!publicKey) return addLog("❌ Connect wallet first!");
     if (!lockToken || !wantToken || !lockAmount || !wantAmount) return addLog("❌ Fill in all fields!");
@@ -211,7 +224,8 @@ function App() {
       const amountABuf = new BN(amountA*1_000_000).toArrayLike(Buffer,"le",8), amountBBuf = new BN(amountB*1_000_000).toArrayLike(Buffer,"le",8);
       const data = Buffer.concat([Buffer.from(MAKE_DISCRIMINATOR), Buffer.from(amountABuf), Buffer.from(amountBBuf)]);
       const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:mintAPubkey, isSigner:false, isWritable:false },{ pubkey:mintBPubkey, isSigner:false, isWritable:false },{ pubkey:makerAtaA, isSigner:false, isWritable:true },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:ep, isSigner:false, isWritable:true },{ pubkey:SystemProgram.programId, isSigner:false, isWritable:false },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false },{ pubkey:ASSOCIATED_TOKEN_PROGRAM_ID, isSigner:false, isWritable:false }];
-      const sig = await signAndSend(new Transaction().add(new TransactionInstruction({ keys, programId: PROGRAM_ID, data })));
+      const tx = new Transaction().add(new TransactionInstruction({ keys, programId: PROGRAM_ID, data }));
+      const sig = await signAndSend(tx);
       setEscrowPda(ep); addLog("✅ Escrow created! " + sig); fetchEscrows();
     } catch (err) { addLog("❌ " + err.message); }
     setLoading(false);
@@ -224,7 +238,8 @@ function App() {
       const takerAtaA = await getAssociatedTokenAddress(escrow.mintA, publicKey), takerAtaB = await getAssociatedTokenAddress(escrow.mintB, publicKey), makerAtaB = await getAssociatedTokenAddress(escrow.mintB, escrow.maker), vault = await getAssociatedTokenAddress(escrow.mintA, escrow.pubkey, true);
       const data = Buffer.from(TAKE_DISCRIMINATOR);
       const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:escrow.maker, isSigner:false, isWritable:true },{ pubkey:escrow.pubkey, isSigner:false, isWritable:true },{ pubkey:escrow.mintA, isSigner:false, isWritable:false },{ pubkey:escrow.mintB, isSigner:false, isWritable:false },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:takerAtaA, isSigner:false, isWritable:true },{ pubkey:takerAtaB, isSigner:false, isWritable:true },{ pubkey:makerAtaB, isSigner:false, isWritable:true },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false },{ pubkey:ASSOCIATED_TOKEN_PROGRAM_ID, isSigner:false, isWritable:false },{ pubkey:SystemProgram.programId, isSigner:false, isWritable:false }];
-      const sig = await signAndSend(new Transaction().add(new TransactionInstruction({ keys, programId: PROGRAM_ID, data })));
+      const tx = new Transaction().add(new TransactionInstruction({ keys, programId: PROGRAM_ID, data }));
+      const sig = await signAndSend(tx);
       addLog("✅ Escrow taken! " + sig); fetchEscrows();
     } catch (err) { addLog("❌ " + err.message); }
     setLoading(false);
@@ -237,7 +252,8 @@ function App() {
       const mintAPubkey = new PublicKey(lockToken), makerAtaA = await getAssociatedTokenAddress(mintAPubkey, publicKey), vault = await getAssociatedTokenAddress(mintAPubkey, escrowPda, true);
       const data = Buffer.from(CANCEL_DISCRIMINATOR);
       const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:escrowPda, isSigner:false, isWritable:true },{ pubkey:mintAPubkey, isSigner:false, isWritable:false },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:makerAtaA, isSigner:false, isWritable:true },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false }];
-      const sig = await signAndSend(new Transaction().add(new TransactionInstruction({ keys, programId: PROGRAM_ID, data })));
+      const tx = new Transaction().add(new TransactionInstruction({ keys, programId: PROGRAM_ID, data }));
+      const sig = await signAndSend(tx);
       setEscrowPda(null); addLog("✅ Escrow cancelled! " + sig); fetchEscrows();
     } catch (err) { addLog("❌ " + err.message); }
     setLoading(false);
@@ -256,7 +272,8 @@ function App() {
       const roleByte = wlRole==="seller"?0:1;
       const data = Buffer.concat([Buffer.from(WL_LIST_DISCRIMINATOR), Buffer.from(amountBuf), Buffer.from([roleByte]), Buffer.from(idBuf)]);
       const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:mint, isSigner:false, isWritable:false },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:ep, isSigner:false, isWritable:true },{ pubkey:SystemProgram.programId, isSigner:false, isWritable:false },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false },{ pubkey:ASSOCIATED_TOKEN_PROGRAM_ID, isSigner:false, isWritable:false }];
-      const sig = await signAndSend(new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data })));
+      const tx = new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data }));
+      const sig = await signAndSend(tx);
       localStorage.setItem("wl_meta_"+ep.toBase58(), JSON.stringify({ projectName:wlProjectName, allocationType:wlAllocationType, quantity:wlQuantity, priceType:wlPriceType, projectLink:wlProjectLink }));
       addLog("✅ WL listing #"+wlId+" created! "+sig); fetchWlEscrows();
     } catch (err) { addLog("❌ "+err.message); }
@@ -270,7 +287,8 @@ function App() {
       const buyerAta = await getAssociatedTokenAddress(escrow.mint, publicKey), vault = await getAssociatedTokenAddress(escrow.mint, escrow.pubkey, true);
       const data = Buffer.from(WL_LOCK_DISCRIMINATOR);
       const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:escrow.mint, isSigner:false, isWritable:false },{ pubkey:escrow.pubkey, isSigner:false, isWritable:true },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:buyerAta, isSigner:false, isWritable:true },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false }];
-      const sig = await signAndSend(new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data })));
+      const tx = new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data }));
+      const sig = await signAndSend(tx);
       addLog("✅ Payment locked! "+sig); fetchWlEscrows();
     } catch (err) { addLog("❌ "+err.message); }
     setLoading(false);
@@ -284,7 +302,8 @@ function App() {
       const sellerAta = await getAssociatedTokenAddress(escrow.mint, seller), vault = await getAssociatedTokenAddress(escrow.mint, escrow.pubkey, true);
       const data = Buffer.from(WL_CONFIRM_DISCRIMINATOR);
       const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:seller, isSigner:false, isWritable:true },{ pubkey:escrow.mint, isSigner:false, isWritable:false },{ pubkey:escrow.pubkey, isSigner:false, isWritable:true },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:sellerAta, isSigner:false, isWritable:true },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false }];
-      const sig = await signAndSend(new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data })));
+      const tx = new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data }));
+      const sig = await signAndSend(tx);
       addLog("✅ WL confirmed! Payment released. "+sig); fetchWlEscrows();
     } catch (err) { addLog("❌ "+err.message); }
     setLoading(false);
@@ -297,7 +316,8 @@ function App() {
       const buyerAta = await getAssociatedTokenAddress(escrow.mint, publicKey), vault = await getAssociatedTokenAddress(escrow.mint, escrow.pubkey, true);
       const data = Buffer.from(WL_DISPUTE_DISCRIMINATOR);
       const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:escrow.mint, isSigner:false, isWritable:false },{ pubkey:escrow.pubkey, isSigner:false, isWritable:true },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:buyerAta, isSigner:false, isWritable:true },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false }];
-      const sig = await signAndSend(new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data })));
+      const tx = new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data }));
+      const sig = await signAndSend(tx);
       addLog("✅ Disputed! Funds returned. "+sig); fetchWlEscrows();
     } catch (err) { addLog("❌ "+err.message); }
     setLoading(false);
@@ -310,7 +330,8 @@ function App() {
       const vault = await getAssociatedTokenAddress(escrow.mint, escrow.pubkey, true);
       const data = Buffer.from(WL_CANCEL_DISCRIMINATOR);
       const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:escrow.pubkey, isSigner:false, isWritable:true },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false }];
-      const sig = await signAndSend(new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data })));
+      const tx = new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data }));
+      const sig = await signAndSend(tx);
       localStorage.removeItem("wl_meta_"+escrow.pubkey.toBase58());
       addLog("✅ Listing cancelled! "+sig); fetchWlEscrows();
     } catch (err) { addLog("❌ "+err.message); }
