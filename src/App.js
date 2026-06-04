@@ -301,7 +301,7 @@ function App() {
       const seller = escrow.role==="seller"?escrow.maker:escrow.taker;
       const sellerAta = await getAssociatedTokenAddress(escrow.mint, seller), vault = await getAssociatedTokenAddress(escrow.mint, escrow.pubkey, true);
       const data = Buffer.from(WL_CONFIRM_DISCRIMINATOR);
-      const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:seller, isSigner:false, isWritable:true },{ pubkey:escrow.mint, isSigner:false, isWritable:false },{ pubkey:escrow.pubkey, isSigner:false, isWritable:true },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:sellerAta, isSigner:false, isWritable:true },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false }];
+      const keys = [{ pubkey:publicKey, isSigner:true, isWritable:true },{ pubkey:seller, isSigner:false, isWritable:true },{ pubkey:escrow.mint, isSigner:false, isWritable:false },{ pubkey:escrow.pubkey, isSigner:false, isWritable:true },{ pubkey:vault, isSigner:false, isWritable:true },{ pubkey:sellerAta, isSigner:false, isWritable:true },{ pubkey:TOKEN_PROGRAM_ID, isSigner:false, isWritable:false },{ pubkey:ASSOCIATED_TOKEN_PROGRAM_ID, isSigner:false, isWritable:false },{ pubkey:SystemProgram.programId, isSigner:false, isWritable:false }];
       const tx = new Transaction().add(new TransactionInstruction({ keys, programId: WL_PROGRAM_ID, data }));
       const sig = await signAndSend(tx);
       addLog("✅ WL confirmed! Payment released. "+sig); fetchWlEscrows();
