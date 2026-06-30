@@ -23,7 +23,6 @@ const WL_DISPUTE_DISCRIMINATOR = [216, 92, 128, 146, 202, 85, 135, 73];
 const WL_CANCEL_DISCRIMINATOR = [232, 219, 223, 41, 219, 236, 220, 190];
 const WL_RESOLVE_DISCRIMINATOR = [231, 6, 202, 6, 96, 103, 12, 230];
 
-// ========== STYLES ==========
 const S = {
   input: { flex: 1, background: "#0f0f0f", border: "1px solid #1f1f1f", borderRadius: 6, padding: "11px 15px", color: "#e0e0e0", fontSize: 13.5, outline: "none", fontFamily: "'Inter', sans-serif", minWidth: 0, transition: "border-color 0.2s, box-shadow 0.2s" },
   select: { flex: 1, background: "#0f0f0f", border: "1px solid #1f1f1f", borderRadius: 6, padding: "11px 34px 11px 15px", color: "#e0e0e0", fontSize: 13.5, outline: "none", fontFamily: "'Inter', sans-serif", minWidth: 0, cursor: "pointer", WebkitAppearance: "none", MozAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center", transition: "border-color 0.2s" },
@@ -34,7 +33,6 @@ const S = {
   label: { fontSize: 10.5, color: "#777", marginBottom: 5, display: "block", fontWeight: 500, textTransform: "uppercase", letterSpacing: "1.2px", fontFamily: "'Inter', sans-serif" },
 };
 
-// ========== TOAST ==========
 function ToastContainer({ toasts, removeToast }) {
   return (
     <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, maxWidth: 360 }}>
@@ -50,7 +48,6 @@ function ToastContainer({ toasts, removeToast }) {
   );
 }
 
-// ========== DISPUTE MODAL ==========
 function DisputeModal({ onClose, onSubmit }) {
   const [reason, setReason] = useState("");
   return (
@@ -98,7 +95,6 @@ function App() {
   const addToast = useCallback((type, message) => { const id = Date.now()+Math.random(); setToasts(p=>[...p,{id,type,message}]); setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500); },[]);
   const removeToast = useCallback((id) => setToasts(p=>p.filter(t=>t.id!==id)),[]);
   const addLog = (msg) => { const t=msg.startsWith("✅")?"success":msg.startsWith("❌")?"error":"warn"; addToast(t,msg.replace(/[✅❌]/g,"").trim()); };
-
   const getWlMintAddress = () => { if(wlPaymentToken==="SOL")return NATIVE_SOL_MINT; if(wlPaymentToken==="USDC")return USDC_DEVNET_MINT; if(wlPaymentToken==="SPL"&&wlCustomMint)return new PublicKey(wlCustomMint); return null; };
   const getPaymentLabel = (mint) => { if(!mint)return"???"; if(mint.equals(NATIVE_SOL_MINT))return"SOL"; if(mint.equals(USDC_DEVNET_MINT))return"USDC"; return mint.toBase58().slice(0,6)+"..."; };
 
@@ -109,7 +105,6 @@ function App() {
 
   const signAndSend = async (tx) => { if(!publicKey)throw new Error("Not connected"); const{bh,lbvh}=await connection.getLatestBlockhash(); tx.recentBlockhash=bh; tx.feePayer=publicKey; if(signTransaction){const s=await signTransaction(tx);const sig=await connection.sendRawTransaction(s.serialize());await connection.confirmTransaction({signature:sig,blockhash:bh,lastValidBlockHeight:lbvh});return sig;} if(sendTransaction)return await sendTransaction(tx,connection); throw new Error("No signing method"); };
 
-  // ============ ALL BUSINESS LOGIC (unchanged) ============
   const createEscrow = async () => { if(!publicKey||!lockToken||!wantToken||!lockAmount||!wantAmount)return addLog("❌ Fill all fields"); setLoading(true); try { const mA=new PublicKey(lockToken),mB=new PublicKey(wantToken); const ata=await getAssociatedTokenAddress(mA,publicKey); const[ep]=PublicKey.findProgramAddressSync([Buffer.from("escrow"),publicKey.toBuffer()],PROGRAM_ID); const v=await getAssociatedTokenAddress(mA,ep,true); const d=Buffer.concat([Buffer.from(MAKE_DISCRIMINATOR),new BN(Number(lockAmount)*1_000_000).toArrayLike(Buffer,"le",8),new BN(Number(wantAmount)*1_000_000).toArrayLike(Buffer,"le",8)]); const k=[{pubkey:publicKey,isSigner:true,isWritable:true},{pubkey:mA,isSigner:false,isWritable:false},{pubkey:mB,isSigner:false,isWritable:false},{pubkey:ata,isSigner:false,isWritable:true},{pubkey:v,isSigner:false,isWritable:true},{pubkey:ep,isSigner:false,isWritable:true},{pubkey:SystemProgram.programId,isSigner:false,isWritable:false},{pubkey:TOKEN_PROGRAM_ID,isSigner:false,isWritable:false},{pubkey:ASSOCIATED_TOKEN_PROGRAM_ID,isSigner:false,isWritable:false}]; const sig=await signAndSend(new Transaction().add(new TransactionInstruction({keys:k,programId:PROGRAM_ID,data:d}))); setEscrowPda(ep); addLog("✅ Escrow created! "+sig); fetchEscrows(); }catch(e){addLog("❌ "+e.message);} setLoading(false); };
   const takeEscrow = async (esc) => { if(!publicKey)return addLog("❌ Connect wallet"); setLoading(true); try { const tAA=await getAssociatedTokenAddress(esc.mintA,publicKey),tAB=await getAssociatedTokenAddress(esc.mintB,publicKey),mAB=await getAssociatedTokenAddress(esc.mintB,esc.maker),v=await getAssociatedTokenAddress(esc.mintA,esc.pubkey,true); const d=Buffer.from(TAKE_DISCRIMINATOR); const k=[{pubkey:publicKey,isSigner:true,isWritable:true},{pubkey:esc.maker,isSigner:false,isWritable:true},{pubkey:esc.pubkey,isSigner:false,isWritable:true},{pubkey:esc.mintA,isSigner:false,isWritable:false},{pubkey:esc.mintB,isSigner:false,isWritable:false},{pubkey:v,isSigner:false,isWritable:true},{pubkey:tAA,isSigner:false,isWritable:true},{pubkey:tAB,isSigner:false,isWritable:true},{pubkey:mAB,isSigner:false,isWritable:true},{pubkey:TOKEN_PROGRAM_ID,isSigner:false,isWritable:false},{pubkey:ASSOCIATED_TOKEN_PROGRAM_ID,isSigner:false,isWritable:false},{pubkey:SystemProgram.programId,isSigner:false,isWritable:false}]; const sig=await signAndSend(new Transaction().add(new TransactionInstruction({keys:k,programId:PROGRAM_ID,data:d}))); addLog("✅ Escrow taken! "+sig); fetchEscrows(); }catch(e){addLog("❌ "+e.message);} setLoading(false); };
   const cancelEscrow = async () => { if(!publicKey||!escrowPda||!lockToken)return addLog("❌ Nothing to cancel"); setLoading(true); try { const mA=new PublicKey(lockToken),ata=await getAssociatedTokenAddress(mA,publicKey),v=await getAssociatedTokenAddress(mA,escrowPda,true); const d=Buffer.from(CANCEL_DISCRIMINATOR); const k=[{pubkey:publicKey,isSigner:true,isWritable:true},{pubkey:escrowPda,isSigner:false,isWritable:true},{pubkey:mA,isSigner:false,isWritable:false},{pubkey:v,isSigner:false,isWritable:true},{pubkey:ata,isSigner:false,isWritable:true},{pubkey:TOKEN_PROGRAM_ID,isSigner:false,isWritable:false}]; const sig=await signAndSend(new Transaction().add(new TransactionInstruction({keys:k,programId:PROGRAM_ID,data:d}))); setEscrowPda(null); addLog("✅ Cancelled! "+sig); fetchEscrows(); }catch(e){addLog("❌ "+e.message);} setLoading(false); };
@@ -124,34 +119,54 @@ function App() {
   const tabs = isArbiter ? [...baseTabs, { key: "arbiter", label: "Arbiter" }] : baseTabs;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#080808", color: "#d4d4d4", fontFamily: "'Inter', sans-serif", position: "relative" }}>
-      {/* Grain overlay */}
-     <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", opacity: 0.13, mixBlendMode: "overlay" }}>
-  <div style={{ position: "absolute", inset: "-50%", width: "200%", height: "200%", backgroundImage: "url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAABYSURBVHja7MoxDYAwEATBPQLw/1+MwQJIKZg3K6m7iM7ZkaSJEn/QpIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZL0twMAAP//AwBmHUmcNnKzGQAAAABJRU5ErkJggg==')", backgroundRepeat: "repeat", backgroundSize: "120px 120px" }}></div>
-</div>
-
+    <div style={{ minHeight: "100vh", background: "#080808", color: "#d4d4d4", fontFamily: "'Inter', sans-serif", position: "relative", isolation: "isolate" }}>
+      {/* Grain overlay - pseudo-element via CSS */}
       <style>{`
         @keyframes slideIn { from { opacity:0;transform:translateX(80px) } to { opacity:1;transform:translateX(0) } }
         input:focus, select:focus, textarea:focus { border-color: #fff !important; box-shadow: 0 0 0 3px rgba(255,255,255,0.04) !important; }
         select option { background: #111; color: #d4d4d4; }
         .hide-mobile { display: flex; } .hide-desktop { display: none; }
+        .grain-bg::before {
+          content: "";
+          position: fixed;
+          inset: -50%;
+          width: 200%;
+          height: 200%;
+          z-index: 0;
+          pointer-events: none;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
+          background-repeat: repeat;
+          background-size: 180px 180px;
+        }
         @media (max-width: 768px) { .hide-mobile { display: none !important; } .hide-desktop { display: flex !important; } .nav-links { display: none !important; } }
       `}</style>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       {disputeTarget && <DisputeModal onClose={() => setDisputeTarget(null)} onSubmit={(reason) => disputeWl(disputeTarget, reason)} />}
 
       <div style={{ position: "relative", zIndex: 1 }}>
-        <nav style={{ borderBottom: "1px solid #1a1a1a", position: "sticky", top: 0, zIndex: 50, background: "rgba(8,8,8,0.9)", backdropFilter: "blur(12px)", padding: "13px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.3px", color: "#fff" }}>Eswift</span>
-          <div className="nav-links" style={{ display: "flex", gap: 24, fontSize: 12.5, color: "#888" }}><span style={{color:"#d4d4d4"}}>Escrow</span><span>Explore</span><span>Marketplace</span></div>
+        {/* Navbar */}
+        <nav style={{ 
+          borderBottom: "1px solid #1a1a1a", position: "sticky", top: 0, zIndex: 50, 
+          background: "rgba(8,8,8,0.85)", backdropFilter: "blur(16px) saturate(180%)",
+          WebkitBackdropFilter: "blur(16px) saturate(180%)",
+          padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+            <span style={{ fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.3px", color: "#fff", cursor: "default" }}>Eswift</span>
+            <div className="nav-links" style={{ display: "flex", gap: 24, fontSize: 12.5, color: "#777" }}>
+              <span style={{color:"#d4d4d4"}}>Escrow</span>
+              <span>Explore</span>
+              <span>Marketplace</span>
+            </div>
+          </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button className="hide-desktop" onClick={() => setMobileMenu(!mobileMenu)} style={{ background: "none", border: "none", color: "#fff", fontSize: 20, cursor: "pointer" }}>{mobileMenu ? "✕" : "☰"}</button>
-            <WalletMultiButton style={{ background: "#fff", color: "#000", fontWeight: 500, fontSize: 12.5, padding: "9px 17px", borderRadius: 6, border: "none", fontFamily: "'Inter', sans-serif" }} />
+            <WalletMultiButton style={{ background: "#fff", color: "#000", fontWeight: 500, fontSize: 12.5, padding: "9px 18px", borderRadius: 6, border: "none", fontFamily: "'Inter', sans-serif", cursor: "pointer" }} />
           </div>
         </nav>
         {mobileMenu && <div className="hide-desktop" style={{ background: "#080808", borderBottom: "1px solid #1a1a1a", padding: "10px 20px", display: "flex", flexDirection: "column", gap: 6 }}>{tabs.map(t=><button key={t.key} onClick={()=>{setTab(t.key);setMobileMenu(false);}} style={{background:"none",border:"none",color:tab===t.key?"#fff":"#888",padding:"8px 0",textAlign:"left",fontSize:13,cursor:"pointer",fontFamily:"'Inter', sans-serif"}}>{t.label}</button>)}</div>}
 
-        <div className="hide-mobile" style={{ display: "flex", justifyContent: "center", borderBottom: "1px solid #1a1a1a" }}>{tabs.map(t=><button key={t.key} onClick={()=>setTab(t.key)} style={{padding:"13px 28px",fontSize:12.5,fontWeight:500,background:"none",border:"none",cursor:"pointer",color:tab===t.key?"#fff":"#777",borderBottom:tab===t.key?"1.5px solid #fff":"1.5px solid transparent",transition:"all 0.2s",fontFamily:"'Inter', sans-serif"}}>{t.label}</button>)}</div>
+        <div className="hide-mobile" style={{ display: "flex", justifyContent: "center", borderBottom: "1px solid #1a1a1a" }}>{tabs.map(t=><button key={t.key} onClick={()=>setTab(t.key)} style={{padding:"14px 30px",fontSize:12.5,fontWeight:500,background:"none",border:"none",cursor:"pointer",color:tab===t.key?"#fff":"#777",borderBottom:tab===t.key?"1.5px solid #fff":"1.5px solid transparent",transition:"all 0.2s",fontFamily:"'Inter', sans-serif"}}>{t.label}</button>)}</div>
 
         <div style={{ maxWidth: 640, margin: "0 auto", padding: "36px 16px 60px" }}>
           {!connected && <div style={{ textAlign: "center", padding: 80 }}><div style={{ fontSize: 24, fontWeight: 600, color: "#fff", marginBottom: 8, letterSpacing: "-0.5px" }}>Eswift</div><div style={{ color: "#888", fontSize: 13.5 }}>Connect your wallet to get started</div></div>}
