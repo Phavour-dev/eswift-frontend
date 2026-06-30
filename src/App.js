@@ -103,7 +103,28 @@ function App() {
   useEffect(()=>{if(connected){fetchEscrows();fetchWlEscrows();}},[connected]);
   useEffect(()=>{if(connected&&tab==="services")fetchWlEscrows();if(connected&&tab!=="services")fetchEscrows();},[tab]);
 
-  const signAndSend = async (tx) => { if(!publicKey)throw new Error("Not connected"); const{bh,lbvh}=await connection.getLatestBlockhash(); tx.recentBlockhash=bh; tx.feePayer=publicKey; if(signTransaction){const s=await signTransaction(tx);const sig=await connection.sendRawTransaction(s.serialize());await connection.confirmTransaction({signature:sig,blockhash:bh,lastValidBlockHeight:lbvh});return sig;} if(sendTransaction)return await sendTransaction(tx,connection); throw new Error("No signing method"); };
+  const signAndSend = async (tx) => {
+    if (!publicKey) throw new Error("Not connected");
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = publicKey;
+    
+    try {
+      if (signTransaction) {
+        const signed = await signTransaction(tx);
+        const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, preflightCommitment: "confirmed" });
+        await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+        return sig;
+      }
+    } catch (e) {
+      console.log("signTransaction failed, trying sendTransaction:", e.message);
+    }
+    
+    if (sendTransaction) {
+      return await sendTransaction(tx, connection, { skipPreflight: false, preflightCommitment: "confirmed" });
+    }
+    throw new Error("No signing method available");
+};
 
   const createEscrow = async () => { if(!publicKey||!lockToken||!wantToken||!lockAmount||!wantAmount)return addLog("❌ Fill all fields"); setLoading(true); try { const mA=new PublicKey(lockToken),mB=new PublicKey(wantToken); const ata=await getAssociatedTokenAddress(mA,publicKey); const[ep]=PublicKey.findProgramAddressSync([Buffer.from("escrow"),publicKey.toBuffer()],PROGRAM_ID); const v=await getAssociatedTokenAddress(mA,ep,true); const d=Buffer.concat([Buffer.from(MAKE_DISCRIMINATOR),new BN(Number(lockAmount)*1_000_000).toArrayLike(Buffer,"le",8),new BN(Number(wantAmount)*1_000_000).toArrayLike(Buffer,"le",8)]); const k=[{pubkey:publicKey,isSigner:true,isWritable:true},{pubkey:mA,isSigner:false,isWritable:false},{pubkey:mB,isSigner:false,isWritable:false},{pubkey:ata,isSigner:false,isWritable:true},{pubkey:v,isSigner:false,isWritable:true},{pubkey:ep,isSigner:false,isWritable:true},{pubkey:SystemProgram.programId,isSigner:false,isWritable:false},{pubkey:TOKEN_PROGRAM_ID,isSigner:false,isWritable:false},{pubkey:ASSOCIATED_TOKEN_PROGRAM_ID,isSigner:false,isWritable:false}]; const sig=await signAndSend(new Transaction().add(new TransactionInstruction({keys:k,programId:PROGRAM_ID,data:d}))); setEscrowPda(ep); addLog("✅ Escrow created! "+sig); fetchEscrows(); }catch(e){addLog("❌ "+e.message);} setLoading(false); };
   const takeEscrow = async (esc) => { if(!publicKey)return addLog("❌ Connect wallet"); setLoading(true); try { const tAA=await getAssociatedTokenAddress(esc.mintA,publicKey),tAB=await getAssociatedTokenAddress(esc.mintB,publicKey),mAB=await getAssociatedTokenAddress(esc.mintB,esc.maker),v=await getAssociatedTokenAddress(esc.mintA,esc.pubkey,true); const d=Buffer.from(TAKE_DISCRIMINATOR); const k=[{pubkey:publicKey,isSigner:true,isWritable:true},{pubkey:esc.maker,isSigner:false,isWritable:true},{pubkey:esc.pubkey,isSigner:false,isWritable:true},{pubkey:esc.mintA,isSigner:false,isWritable:false},{pubkey:esc.mintB,isSigner:false,isWritable:false},{pubkey:v,isSigner:false,isWritable:true},{pubkey:tAA,isSigner:false,isWritable:true},{pubkey:tAB,isSigner:false,isWritable:true},{pubkey:mAB,isSigner:false,isWritable:true},{pubkey:TOKEN_PROGRAM_ID,isSigner:false,isWritable:false},{pubkey:ASSOCIATED_TOKEN_PROGRAM_ID,isSigner:false,isWritable:false},{pubkey:SystemProgram.programId,isSigner:false,isWritable:false}]; const sig=await signAndSend(new Transaction().add(new TransactionInstruction({keys:k,programId:PROGRAM_ID,data:d}))); addLog("✅ Escrow taken! "+sig); fetchEscrows(); }catch(e){addLog("❌ "+e.message);} setLoading(false); };
