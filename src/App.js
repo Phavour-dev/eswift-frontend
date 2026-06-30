@@ -9,7 +9,7 @@ import BN from "bn.js";
 const PROGRAM_ID = new PublicKey("BHVRj3va6pdvTbArbeM7Vvqc1hdrK78msDkHrDwb8w9V");
 const WL_PROGRAM_ID = new PublicKey("9ip7pDxZe45kck5ZBTFu8q7HZa51g1v11bvnGpZhEhJZ");
 const ARBITER_PUBKEY = new PublicKey("9hYM4ybCP4arzPZxKBUjUCRr5BeJUoCCVybcUTtNg8uX");
-const network = "https://api.devnet.solana.com";
+const network = "https://devnet.helius-rpc.com/?api-key=0b414f3a-c0a5-4972-b27c-2763bb414914";
 const NATIVE_SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 const USDC_DEVNET_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
 
