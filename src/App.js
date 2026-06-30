@@ -119,8 +119,7 @@ function App() {
   const tabs = isArbiter ? [...baseTabs, { key: "arbiter", label: "Arbiter" }] : baseTabs;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#080808", color: "#d4d4d4", fontFamily: "'Inter', sans-serif", position: "relative", isolation: "isolate" }}>
-      {/* Grain overlay - pseudo-element via CSS */}
+    <div className="grain-bg" style={{ minHeight: "100vh", background: "#080808", color: "#d4d4d4", fontFamily: "'Inter', sans-serif", position: "relative", isolation: "isolate" }}>
       <style>{`
         @keyframes slideIn { from { opacity:0;transform:translateX(80px) } to { opacity:1;transform:translateX(0) } }
         input:focus, select:focus, textarea:focus { border-color: #fff !important; box-shadow: 0 0 0 3px rgba(255,255,255,0.04) !important; }
@@ -128,37 +127,18 @@ function App() {
         .hide-mobile { display: flex; } .hide-desktop { display: none; }
         .grain-bg::before {
           content: "";
-          position: fixed;
-          inset: -50%;
-          width: 200%;
-          height: 200%;
-          z-index: 0;
-          pointer-events: none;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
-          background-repeat: repeat;
-          background-size: 180px 180px;
+          position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.18;
+          background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAABYSURBVHja7MoxDYAwEATBPQLw/1+MwQJIKZg3K6m7iM7ZkaSJEn/QpIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZL0twMAAP//AwBmHUmcNnKzGQAAAABJRU5ErkJggg==");
+          background-repeat: repeat; background-size: 100px 100px;
         }
-        @media (max-width: 768px) { .hide-mobile { display: none !important; } .hide-desktop { display: flex !important; } .nav-links { display: none !important; } }
+        @media (max-width: 768px) { .hide-mobile { display: none !important; } .hide-desktop { display: flex !important; } }
       `}</style>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       {disputeTarget && <DisputeModal onClose={() => setDisputeTarget(null)} onSubmit={(reason) => disputeWl(disputeTarget, reason)} />}
 
       <div style={{ position: "relative", zIndex: 1 }}>
-        {/* Navbar */}
-        <nav style={{ 
-          borderBottom: "1px solid #1a1a1a", position: "sticky", top: 0, zIndex: 50, 
-          background: "rgba(8,8,8,0.85)", backdropFilter: "blur(16px) saturate(180%)",
-          WebkitBackdropFilter: "blur(16px) saturate(180%)",
-          padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-            <span style={{ fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.3px", color: "#fff", cursor: "default" }}>Eswift</span>
-            <div className="nav-links" style={{ display: "flex", gap: 24, fontSize: 12.5, color: "#777" }}>
-              <span style={{color:"#d4d4d4"}}>Escrow</span>
-              <span>Explore</span>
-              <span>Marketplace</span>
-            </div>
-          </div>
+        <nav style={{ borderBottom: "1px solid #1a1a1a", position: "sticky", top: 0, zIndex: 50, background: "rgba(8,8,8,0.85)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontWeight: 600, fontSize: 15.5, letterSpacing: "-0.3px", color: "#fff" }}>Eswift</span>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button className="hide-desktop" onClick={() => setMobileMenu(!mobileMenu)} style={{ background: "none", border: "none", color: "#fff", fontSize: 20, cursor: "pointer" }}>{mobileMenu ? "✕" : "☰"}</button>
             <WalletMultiButton style={{ background: "#fff", color: "#000", fontWeight: 500, fontSize: 12.5, padding: "9px 18px", borderRadius: 6, border: "none", fontFamily: "'Inter', sans-serif", cursor: "pointer" }} />
@@ -171,7 +151,7 @@ function App() {
         <div style={{ maxWidth: 640, margin: "0 auto", padding: "36px 16px 60px" }}>
           {!connected && <div style={{ textAlign: "center", padding: 80 }}><div style={{ fontSize: 24, fontWeight: 600, color: "#fff", marginBottom: 8, letterSpacing: "-0.5px" }}>Eswift</div><div style={{ color: "#888", fontSize: 13.5 }}>Connect your wallet to get started</div></div>}
 
-          {/* CREATE TAB */}
+          {/* ====== ALL TABS UNCHANGED ====== */}
           {connected && tab === "create" && (
             <div style={S.card}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", marginBottom: 22, letterSpacing: "-0.3px" }}>Create Token Escrow</div>
@@ -184,8 +164,6 @@ function App() {
               {escrowPda&&<button onClick={cancelEscrow} disabled={loading} style={{...S.btn("transparent","#ef4444","#ef4444"),width:"100%",padding:"11px",marginTop:8,fontSize:13.5}}>Cancel Escrow</button>}
             </div>
           )}
-
-          {/* EXPLORE TAB */}
           {connected && tab === "explore" && (
             <div>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}><div style={{fontSize:15,fontWeight:600,color:"#fff",letterSpacing:"-0.3px"}}>Explore</div><button onClick={fetchEscrows} style={{...S.btn("#0f0f0f","#999","#1f1f1f"),padding:"7px 15px",fontSize:12}}>Refresh</button></div>
@@ -193,8 +171,6 @@ function App() {
               {allEscrows.map((esc,i)=><div key={i} style={{...S.card,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:10.5,color:"#888",marginBottom:4,fontFamily:"monospace"}}>{esc.pubkey.toBase58().slice(0,10)}...</div><div style={{fontSize:13.5,fontWeight:500}}>Locked: {esc.amountA.div(new BN(1_000_000)).toString()} Token A</div><div style={{fontSize:13.5,fontWeight:500}}>Wants: {esc.amountB.div(new BN(1_000_000)).toString()} Token B</div></div><button onClick={()=>takeEscrow(esc)} disabled={loading||esc.maker.equals(publicKey)} style={{...S.btn(esc.maker.equals(publicKey)?"#0f0f0f":"#fff",esc.maker.equals(publicKey)?"#888":"#000",esc.maker.equals(publicKey)?"#1f1f1f":"#fff"),padding:"9px 18px",fontSize:12.5}}>{esc.maker.equals(publicKey)?"Yours":"Take"}</button></div>)}
             </div>
           )}
-
-          {/* MY TAB */}
           {connected && tab === "my" && (
             <div>
               <div style={{fontSize:15,fontWeight:600,color:"#fff",marginBottom:20,letterSpacing:"-0.3px"}}>My Escrows</div>
@@ -202,8 +178,6 @@ function App() {
               {allEscrows.filter(e=>e.maker.equals(publicKey)).map((esc,i)=><div key={i} style={{...S.card,marginBottom:10}}><div style={{fontSize:13.5,fontWeight:500}}>Locked: {esc.amountA.div(new BN(1_000_000)).toString()} Token A</div><div style={{fontSize:13.5,fontWeight:500,marginBottom:14}}>Wants: {esc.amountB.div(new BN(1_000_000)).toString()} Token B</div><button onClick={()=>{setEscrowPda(esc.pubkey);setLockToken(esc.mintA.toBase58());cancelEscrow();}} disabled={loading} style={{...S.btn("transparent","#ef4444","#ef4444"),padding:"8px 18px",fontSize:12.5}}>Cancel</button></div>)}
             </div>
           )}
-
-          {/* SERVICES TAB */}
           {connected && tab === "services" && (
             <div>
               <div style={{fontSize:15,fontWeight:600,color:"#fff",marginBottom:20,letterSpacing:"-0.3px"}}>Whitelist Services</div>
@@ -242,8 +216,6 @@ function App() {
               </div>);})}
             </div>
           )}
-
-          {/* ARBITER TAB */}
           {connected && tab === "arbiter" && isArbiter && (
             <div>
               <div style={{fontSize:15,fontWeight:600,color:"#fff",marginBottom:20,letterSpacing:"-0.3px"}}>Arbiter Dashboard</div>
